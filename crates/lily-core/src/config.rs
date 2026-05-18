@@ -42,7 +42,7 @@ pub fn load_or_create_token(create_if_missing: bool) -> Result<String> {
     }
     if !create_if_missing {
         anyhow::bail!(
-            "token not found at {} — is lilyd installed on the worker user?",
+            "token not found at {} — is lilyd installed on the assistant?",
             path.display()
         );
     }

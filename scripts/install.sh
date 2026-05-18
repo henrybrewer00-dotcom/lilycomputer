@@ -2,9 +2,9 @@
 # Lily Computer installer.
 #
 # Usage:
-#   ./scripts/install.sh client   # on stevebrewer: install lily binary
-#   ./scripts/install.sh daemon   # on rhettbrewer: install lilyd + LaunchAgent
-#   ./scripts/install.sh both     # install both (use only when running as the worker user)
+#   ./scripts/install.sh client   # install just the lily TUI binary
+#   ./scripts/install.sh daemon   # install lilyd + LaunchAgent (run as the assistant)
+#   ./scripts/install.sh both     # install both on the current user (single-user setup)
 
 set -euo pipefail
 

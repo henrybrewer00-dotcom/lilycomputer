@@ -7,7 +7,7 @@ user account via Fast User Switching, so it can work while you keep using
 your computer.
 
 ```
-┌─ lily computer ─────────────────── stevebrewer → rhettbrewer ● live ┐
+┌─ lily computer · you ● live ────────────────────────────────────────┐
 │   __    _ __         ______                            __           │
 │  / /   (_) /_  __   / ____/___  ____ ___  ____  __  __/ /____  _____│
 │ / /   / / / / / /  / /   / __ \/ __ `__ \/ __ \/ / / / __/ _ \/ ___/│
@@ -23,15 +23,22 @@ your computer.
 └─ ⏱ 3.1s · 4 tools · 2,840 tok · ⌃C cancel · ⌃R clear · /help ──────┘
 ```
 
-## Quick install (one command)
+## Install — one short command
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/henrybrewer00-dotcom/lilycomputer/main/setup.sh | bash
+curl -L tinyurl.com/lilyget|sh
 ```
 
-That installs Rust if missing, clones the repo, builds the binaries, installs the
-daemon as a LaunchAgent, and prints the remaining 3 manual steps (Groq key +
-Chrome extension load + daemon restart). Total time: ~90 seconds.
+(Easy to type on a second Mac.) It installs Rust if missing, clones the repo,
+builds, registers `lilyd` as a LaunchAgent, asks for your Groq key, discovers
+your Chrome profiles with an **arrow-key picker**, then auto-launches Chrome
+with the Lily extension loaded into the profile you chose. Total time: ~90s.
+
+You'll end up with three commands on `$PATH`:
+
+- `lily` (or `lc`) — the TUI client
+- `lilyd` — the daemon (auto-started by LaunchAgent)
+- `lily-chrome` — relaunches Chrome with the extension loaded into your chosen profile
 
 ## Have an AI agent set it up for you
 
@@ -46,22 +53,17 @@ terminal, paste this prompt and let it run:
 >
 > 1. Run the one-line installer in my home directory:
 >    ```bash
->    curl -fsSL https://raw.githubusercontent.com/henrybrewer00-dotcom/lilycomputer/main/setup.sh | bash
+>    curl -L tinyurl.com/lilyget|sh
 >    ```
->    It installs Rust if needed, clones to `~/lilycomputer`, builds, and installs the daemon as a LaunchAgent.
+>    It installs Rust if needed, clones to `~/lilycomputer`, builds, installs the daemon as a LaunchAgent, asks me for my Groq key, shows me an arrow-key picker for Chrome profiles, and relaunches Chrome with the extension auto-loaded.
 >
 > 2. Ask me for my Groq API key (I can get one at <https://console.groq.com/keys>). Write it to `~/.lily/env` in the format `GROQ_API_KEY=gsk_...` with mode `600`. Do NOT echo the key into shell history or commit it.
 >
-> 3. Tell me to open `chrome://extensions` on this Mac, toggle Developer mode, click *Load unpacked*, and select `~/lilycomputer/extension`. Wait for me to confirm.
+> 3. The installer already loaded the extension into the Chrome profile I picked, so this is done — but tell me to use `lily-chrome` if I want the extension to load every time Chrome opens.
 >
-> 4. Restart the daemon so it picks up the new key:
->    ```bash
->    launchctl kickstart -k gui/$(id -u)/computer.lily.daemon
->    ```
+> 4. Run `~/lilycomputer/scripts/doctor.sh`. The "Chrome extension — connected" line should be green. If any macOS permission lines are red (only relevant for non-browser tools like Mail/Finder), follow the script's instructions.
 >
-> 5. Run `~/lilycomputer/scripts/doctor.sh`. All four checks should report green: Screen Recording, Automation, Accessibility, and Chrome extension. If any are red, follow the script's on-screen instructions — most permission failures need a one-time grant in System Settings.
->
-> 6. Confirm by running `lily --once "what's on my screen right now"`. If it returns a description, we're done. Tell me to just run `lily` (or the `lc` shortcut) any time.
+> 5. Confirm by running `lily --once "what's open in chrome right now"`. If it returns a description, we're done. Tell me to just run `lily` (or `lc`) any time.
 
 ## How it works
 
@@ -143,7 +145,7 @@ lc                        # symlink alias
 
 ## Permissions
 
-The macOS-side tools need three TCC grants on the worker user (one-time, only
+The macOS-side tools need three TCC grants on the assistant (one-time, only
 if you want native control beyond Chrome):
 
 - **Screen Recording** — for `screencapture` (foreground only on Tahoe)

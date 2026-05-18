@@ -71,9 +71,9 @@ async fn main() -> Result<()> {
     // Quick health probe up-front for a clearer error.
     if let Err(e) = client.health().await {
         eprintln!("\n  lily: cannot reach lilyd at {} — {e}\n", lily_core::daemon_base_url());
-        eprintln!("  Is lilyd running on the worker user (rhettbrewer)?");
-        eprintln!("  Check `launchctl print gui/$(id -u rhettbrewer)/computer.lily.daemon` from that session,");
-        eprintln!("  or run `~/.cargo/bin/lilyd` directly to debug.");
+        eprintln!("  Is lilyd running on this machine?");
+        eprintln!("  Try:  launchctl print gui/$(id -u)/computer.lily.daemon");
+        eprintln!("  Or run `~/.local/bin/lilyd` directly to debug.");
         std::process::exit(2);
     }
 

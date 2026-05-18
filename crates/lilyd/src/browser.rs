@@ -66,7 +66,7 @@ impl BrowserBridge {
         let rx = {
             let mut inner = self.inner.lock().await;
             let Some(tx) = inner.tx_to_ext.clone() else {
-                return Err(anyhow!("no Chrome extension is connected — open Chrome on the worker user and verify the Lily extension is loaded and enabled"));
+                return Err(anyhow!("no Chrome extension is connected — open Chrome on the assistant and verify the Lily extension is loaded and enabled"));
             };
             let (tx_resp, rx_resp) = oneshot::channel();
             inner.pending.insert(id.clone(), tx_resp);

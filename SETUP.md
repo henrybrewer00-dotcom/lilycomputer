@@ -41,7 +41,7 @@ want the daemon to live on.
 curl -fsSL https://raw.githubusercontent.com/henrybrewer00-dotcom/lilycomputer/main/setup.sh | bash
 ```
 
-For dual-user, switch to the worker account (e.g. `rhettbrewer`), open a
+For dual-user, switch to the assistant account (e.g. `the assistant user`), open a
 Terminal, and run the same command there.
 
 ### Manual
@@ -55,7 +55,7 @@ cd ~/lilycomputer
 `install.sh` accepts `client`, `daemon`, or `both`. Examples:
 
 - `./scripts/install.sh both` — typical single-user setup
-- `./scripts/install.sh daemon` (as `rhettbrewer`) + `./scripts/install.sh client` (as `stevebrewer`) — dual-user
+- `./scripts/install.sh daemon` (as `the assistant user`) + `./scripts/install.sh client` (as `your-main-user`) — dual-user
 
 The daemon is registered as a LaunchAgent
 (`~/Library/LaunchAgents/computer.lily.daemon.plist`) so it survives reboot

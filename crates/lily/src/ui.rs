@@ -33,9 +33,10 @@ fn draw_header(f: &mut Frame, area: Rect, state: &AppState) {
         "acting"   => Span::styled("●", Style::default().fg(Color::Green)),
         _          => Span::styled("●", Style::default().fg(Color::DarkGray)),
     };
+    let user = std::env::var("USER").unwrap_or_else(|_| "user".to_string());
     let title = vec![
         Span::styled(" lily computer ", Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
-        Span::styled("· stevebrewer → rhettbrewer ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("· {user} "), Style::default().fg(Color::DarkGray)),
         dot,
         Span::raw(" "),
         Span::styled(state.last_status.clone(), Style::default().fg(Color::Gray)),

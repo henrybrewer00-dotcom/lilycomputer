@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lily Computer doctor — diagnose & repair common problems.
-# Run this AS THE WORKER USER (rhettbrewer).
+# Run this as the user where lilyd is installed.
 set -uo pipefail
 
 WHO="$(id -un)"
@@ -116,7 +116,7 @@ if $auto_ok; then
   ok "Automation → System Events — daemon can talk to apps"
 else
   bad "Automation FAILED for osascript (causes -1743 errors)"
-  warn "Run in rhettbrewer's terminal:  ~/.local/bin/lilyd warmup"
+  warn "Run in the assistant's terminal:  ~/.local/bin/lilyd warmup"
   warn "Click 'Allow' on the Automation popup. Then kickstart, re-run doctor."
 fi
 
@@ -125,7 +125,7 @@ if $acc_ok; then
 else
   bad "Accessibility FAILED for osascript (causes -1002 / 'not allowed assistive access')"
   warn "macOS attributes click/keystroke to osascript itself, not lilyd."
-  warn "Fix #1: run  ~/.local/bin/lilyd warmup  in rhettbrewer's terminal — should pop a"
+  warn "Fix #1: run  ~/.local/bin/lilyd warmup  in the assistant's terminal — should pop a"
   warn "         dialog 'osascript wants to control your computer' → click Allow."
   warn "Fix #2 (if no dialog appears): System Settings → Privacy → Accessibility,"
   warn "         click +, press Cmd+Shift+G, type /usr/bin/osascript, Open, toggle ON."

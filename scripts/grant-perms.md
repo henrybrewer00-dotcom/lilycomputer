@@ -1,6 +1,6 @@
-# One-time permission grants (worker user)
+# One-time permission grants (assistant)
 
-These must be done **once**, while logged in as the worker user (`rhettbrewer`).
+These must be done **once**, while logged in as the assistant.
 
 > **The single most common reason "I gave permission but it doesn't work":**
 > the daemon was already running when you granted the permission, so it

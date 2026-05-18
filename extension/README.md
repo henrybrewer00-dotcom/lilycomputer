@@ -6,14 +6,14 @@ The extension's service worker keeps a WebSocket open to `lilyd`
 `navigate`, `click`, `type`, `screenshot`, `read_page`, `query`,
 `scroll`, `tabs`.
 
-## Install (one-time, on the worker user)
+## Install (one-time, on the assistant)
 
-1. Open Chrome on the user where `lilyd` runs (e.g. `rhettbrewer`).
+1. Open Chrome on the macOS user where `lilyd` runs.
 2. Visit `chrome://extensions`.
 3. Toggle **Developer mode** on (top right).
 4. Click **Load unpacked**.
 5. Pick the `extension/` directory inside this repo
-   (`/Users/stevebrewer/LilyComputer/extension`).
+   (typically `~/lilycomputer/extension`).
 6. You should see "Lily Computer" appear in the list. Pin it for visibility.
 
 The service worker connects automatically. Click the extension icon →

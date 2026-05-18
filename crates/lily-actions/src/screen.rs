@@ -119,7 +119,7 @@ async fn capture_png() -> Result<Vec<u8>> {
     anyhow::bail!(
         "screencapture failed (all 4 variants). Could be Screen Recording perm missing, or display unavailable.\n\
          Variants tried:\n  {}\n\
-         To check perms: in rhettbrewer's terminal run `~/.local/bin/lilyd warmup`.",
+         To check perms: in the assistant's terminal run `~/.local/bin/lilyd warmup`.",
         combined
     );
 }

@@ -109,7 +109,7 @@ pub fn tool_schemas() -> serde_json::Value {
     serde_json::json!([
         {"type":"function","function":{
             "name":"screenshot",
-            "description":"Capture the current screen of the worker user (rhettbrewer) and attach it to the conversation. Use this BEFORE any click to confirm what's on screen, and AFTER actions to verify results.",
+            "description":"Capture the current macOS screen and attach it to the conversation. Use this BEFORE any visual action to confirm what's on screen. NOTE: on Tahoe, this fails on backgrounded Fast-User-Switched sessions — prefer the browser_* tools for web work, or the AX-tree tools (read_ui, get_text, click_element) for native apps.",
             "parameters":{"type":"object","properties":{},"required":[]}
         }},
         {"type":"function","function":{
@@ -195,7 +195,7 @@ pub fn tool_schemas() -> serde_json::Value {
         }},
         {"type":"function","function":{
             "name":"read_file",
-            "description":"Read a UTF-8 file from the worker user's filesystem (truncated to 200KB).",
+            "description":"Read a UTF-8 file from the assistant's filesystem (truncated to 200KB).",
             "parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}
         }},
         {"type":"function","function":{

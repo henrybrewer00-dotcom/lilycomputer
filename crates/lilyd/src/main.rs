@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
                 println!("usage: lilyd [warmup|diagnose]\n");
                 println!("  (no args) — run the HTTP daemon (this is what the LaunchAgent does)");
                 println!("  warmup    — trigger the macOS Automation prompt for System Events");
-                println!("              run this from a terminal in the worker session, then click 'Allow'");
+                println!("              run this from a terminal in the assistant session, then click 'Allow'");
                 println!("  diagnose  — test screencapture + Automation from a foreground context");
                 return Ok(());
             }
@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
 }
 
 /// Trigger TCC prompts for screencapture + System Events. Run this from a
-/// terminal in the worker user's session: the daemon launched via LaunchAgent
+/// terminal in the assistant's session: the daemon launched via LaunchAgent
 /// usually can't show a TCC dialog because there's no foreground responsible
 /// process, but `lilyd warmup` invoked from Terminal/iTerm CAN.
 async fn warmup() -> Result<()> {

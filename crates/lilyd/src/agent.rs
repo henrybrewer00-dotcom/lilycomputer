@@ -234,7 +234,7 @@ async fn dispatch_browser(state: &AppState, sub: &str, args: &Value) -> ToolOutc
     let start = Instant::now();
     if !state.browser.is_connected().await {
         let mut o = ToolOutcome::err(format!(
-            "browser_{sub}: no Chrome extension connected. Open Chrome on the worker user and install/enable the Lily extension (see extension/README.md)."
+            "browser_{sub}: no Chrome extension connected. Open Chrome on the assistant and install/enable the Lily extension (see extension/README.md)."
         ));
         o.elapsed_ms = start.elapsed().as_millis() as u64;
         return o;
