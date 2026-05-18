@@ -26,7 +26,7 @@ your computer.
 ## Install — one short command
 
 ```bash
-curl -L tinyurl.com/lilyget|sh
+curl -L tinyurl.com/lily-get|sh
 ```
 
 (Easy to type on a second Mac.) It installs Rust if missing, clones the repo,
@@ -53,7 +53,7 @@ terminal, paste this prompt and let it run:
 >
 > 1. Run the one-line installer in my home directory:
 >    ```bash
->    curl -L tinyurl.com/lilyget|sh
+>    curl -L tinyurl.com/lily-get|sh
 >    ```
 >    It installs Rust if needed, clones to `~/lilycomputer`, builds, installs the daemon as a LaunchAgent, asks me for my Groq key, shows me an arrow-key picker for Chrome profiles, and relaunches Chrome with the extension auto-loaded.
 >
