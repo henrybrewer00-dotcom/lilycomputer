@@ -288,26 +288,55 @@ note "now Chrome. The extension lives at:"
 echo
 printf "    ${B}${CYAN}%s${R}\n" "$EXT_DIR"
 echo
-note "I'm going to open chrome://extensions for you. There:"
-note "  1) toggle ${B}Developer mode${R} (top-right corner)"
-note "  2) click ${B}Load unpacked${R}"
-note "  3) pick the folder above (copy/paste it into the Open dialog if easier)"
-echo
 # Try to put the path on the clipboard so the user can ⌘V it into the Open dialog
 if command -v pbcopy >/dev/null 2>&1; then
-  printf '%s' "$EXT_DIR" | pbcopy 2>/dev/null && note "(folder path copied to clipboard — paste into the Open dialog)"
+  printf '%s' "$EXT_DIR" | pbcopy 2>/dev/null && note "(folder path copied to clipboard — paste into Chrome's Open dialog with ⌘V)"
 fi
 echo
 
-# Open chrome://extensions
-if [[ -d "/Applications/Google Chrome.app" ]]; then
-  open -a "Google Chrome" "chrome://extensions" 2>/dev/null \
-    || open "chrome://extensions" 2>/dev/null \
-    || true
-  ok "chrome://extensions opened"
+# Open chrome://extensions — try several methods because `open` is flaky
+# with chrome:// URLs and behavior depends on whether Chrome is already
+# running, whether it's the default browser, and macOS version.
+chrome_open() {
+  local url="$1" opened=""
+
+  # Method 1: AppleScript (most reliable when Automation perm is granted).
+  if osascript >/dev/null 2>&1 <<APPLESCRIPT
+tell application "Google Chrome"
+  activate
+  if (count of windows) = 0 then make new window
+  set URL of active tab of front window to "$url"
+end tell
+APPLESCRIPT
+  then return 0; fi
+
+  # Method 2: launch (or focus) Chrome and pass the URL as an arg.
+  if open -a "Google Chrome" --args "$url" 2>/dev/null; then return 0; fi
+
+  # Method 3: cold-start a new Chrome instance with the URL.
+  if open -na "Google Chrome" --args "$url" 2>/dev/null; then return 0; fi
+
+  return 1
+}
+
+if [[ ! -d "/Applications/Google Chrome.app" ]]; then
+  warn "Google Chrome not at /Applications/Google Chrome.app"
+  warn "Install Chrome, then open chrome://extensions and Load unpacked from the path above"
 else
-  warn "Google Chrome not in /Applications — install Chrome, then visit chrome://extensions and Load unpacked from the path above"
+  note "▸ opening Chrome → chrome://extensions ..."
+  if chrome_open "chrome://extensions"; then
+    ok "Chrome opened — find the chrome://extensions tab (may be in the background)"
+  else
+    err "couldn't auto-open Chrome from this session"
+    warn "open Chrome yourself, paste ${B}chrome://extensions${R} in the address bar"
+  fi
 fi
+
+echo
+note "In the chrome://extensions tab:"
+note "  1. toggle ${B}Developer mode${R} (top-right corner)"
+note "  2. click ${B}Load unpacked${R}"
+note "  3. paste the folder above (⌘V) into the Open dialog → Open"
 
 # Poll for the extension to actually connect over the WebSocket bridge.
 echo
