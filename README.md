@@ -25,20 +25,34 @@ your computer.
 
 ## Install — one short command
 
+**Single-user** (one Mac account does it all):
+
 ```bash
 curl -L tinyurl.com/lily-get|sh
 ```
 
-(Easy to type on a second Mac.) It installs Rust if missing, clones the repo,
-builds, registers `lilyd` as a LaunchAgent, asks for your Groq key, discovers
-your Chrome profiles with an **arrow-key picker**, then auto-launches Chrome
-with the Lily extension loaded into the profile you chose. Total time: ~90s.
+That installs Rust if needed, builds, registers `lilyd` as a LaunchAgent,
+asks for your Groq key, walks you through the three macOS permissions
+(opening each Privacy pane in turn), copies the extension folder path to
+your clipboard, and opens `chrome://extensions` so you can Load Unpacked
+in two clicks. ~90 seconds total.
 
-You'll end up with three commands on `$PATH`:
+**Dual-user** (one Mac account runs the daemon + Chrome, another runs the TUI).
+Same installer, run on each account:
 
-- `lily` (or `lc`) — the TUI client
-- `lilyd` — the daemon (auto-started by LaunchAgent)
-- `lily-chrome` — relaunches Chrome with the extension loaded into your chosen profile
+```bash
+# On the assistant (the account that drives Chrome — Fast User Switch here first)
+curl -L tinyurl.com/lily-get|sh
+
+# On the client (your normal account, where you type prompts)
+curl -L tinyurl.com/lily-get|sh -s client
+```
+
+`-s client` is a ~15-second variant that just installs the `lily` TUI
+binary — no daemon, no Chrome, no perms. It talks to the assistant's
+`lilyd` over machine-local loopback (`127.0.0.1:7777`).
+
+See [SETUP.md](SETUP.md) for the full step-by-step on each side.
 
 ## Have an AI agent set it up for you
 

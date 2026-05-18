@@ -8,6 +8,14 @@
 
 set -euo pipefail
 
+# Mode — passed via:  curl ... | sh -s client    (or "assistant" / "both")
+# Defaults to a full install (assistant + client on the same user).
+MODE="${1:-both}"
+case "$MODE" in
+  client|assistant|both) ;;
+  *) printf 'usage: curl ... | sh -s [client|assistant|both]\n' >&2; exit 2 ;;
+esac
+
 # ───── styling ───────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
   B=$'\033[1m'; R=$'\033[0m'
@@ -17,7 +25,12 @@ else
   B=""; R=""; PINK=""; GREEN=""; RED=""; GRAY=""; YEL=""; CYAN=""
 fi
 
-STEP=0; TOTAL=8
+STEP=0
+case "$MODE" in
+  client)    TOTAL=5 ;;
+  assistant) TOTAL=8 ;;
+  both)      TOTAL=8 ;;
+esac
 step()  { STEP=$((STEP+1)); printf "\n${B}${PINK}[%d/%d]${R} ${B}%s${R}\n" "$STEP" "$TOTAL" "$1"; }
 ok()    { printf "  ${GREEN}✓${R} %s\n" "$*"; }
 warn()  { printf "  ${YEL}!${R} %s\n" "$*"; }
@@ -82,9 +95,16 @@ cd "$REPO_DIR"
 # ───── 4. build ───────────────────────────────────────────────────────────────
 step "building (~1 min cold, ~25s incremental)"
 LOG="$(mktemp -t lily-build).log"
-if cargo build --release 2>"$LOG" 1>&2; then
+case "$MODE" in
+  client) BUILD_ARGS="-p lily" ;;
+  *)      BUILD_ARGS="" ;;
+esac
+if cargo build --release $BUILD_ARGS 2>"$LOG" 1>&2; then
   rm -f "$LOG"
-  ok "built lily + lilyd"
+  case "$MODE" in
+    client) ok "built lily" ;;
+    *)      ok "built lily + lilyd" ;;
+  esac
 else
   err "build failed — last 30 lines:"
   tail -30 "$LOG"; rm -f "$LOG"
@@ -92,8 +112,26 @@ else
 fi
 
 # ───── 5. binaries + LaunchAgent ─────────────────────────────────────────────
-step "installing binaries + LaunchAgent"
-./scripts/install.sh both 2>&1 | sed "s/^/  ${GRAY}|${R} /"
+case "$MODE" in
+  client) step "installing client binary (lily)" ;;
+  *)      step "installing binaries + LaunchAgent" ;;
+esac
+./scripts/install.sh "$MODE" 2>&1 | sed "s/^/  ${GRAY}|${R} /"
+
+# Client-only mode is done after step 5. The remaining steps are
+# permissions + Chrome which only matter on the assistant side.
+if [[ "$MODE" == "client" ]]; then
+  echo
+  hr
+  printf "  ${B}lily client is ready.${R}\n\n"
+  printf "  Make sure your assistant Mac has lilyd running, then:\n\n"
+  printf "    ${B}lily${R}      ${GRAY}# launch the TUI${R}\n"
+  printf "    ${B}lc${R}        ${GRAY}# shorter alias${R}\n\n"
+  printf "  ${GRAY}On the assistant, run:  curl -L tinyurl.com/lily-get|sh -s assistant${R}\n"
+  hr
+  echo
+  exit 0
+fi
 TOKEN_FILE=/Users/Shared/lily/token
 for i in 1 2 3 4 5 6 7 8 9 10; do
   [[ -r "$TOKEN_FILE" ]] && break
