@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Lily Computer — short installer.
-# Type:  curl -L https://raw.githubusercontent.com/henrybrewer00-dotcom/lilycomputer/main/i | sh
+#   curl -L tinyurl.com/lily-get | sh
 #
-# Picks up your existing Chrome profile, auto-loads the extension into it, and
-# leaves you with `lily` ready to run.
+# Walks you through: build → install daemon → Groq key → macOS permissions
+# (Screen Recording, Automation, Accessibility) → Chrome extension via
+# Load Unpacked at chrome://extensions. Ends with a working `lily`.
 
 set -euo pipefail
 
@@ -16,15 +17,19 @@ else
   B=""; R=""; PINK=""; GREEN=""; RED=""; GRAY=""; YEL=""; CYAN=""
 fi
 
-STEP=0; TOTAL=7
-step() { STEP=$((STEP+1)); printf "\n${B}${PINK}[%d/%d]${R} ${B}%s${R}\n" "$STEP" "$TOTAL" "$1"; }
-ok()   { printf "  ${GREEN}✓${R} %s\n" "$*"; }
-warn() { printf "  ${YEL}!${R} %s\n" "$*"; }
-err()  { printf "  ${RED}✗${R} %s\n" "$*" >&2; }
-note() { printf "  ${GRAY}%s${R}\n" "$*"; }
-hr()   { printf "${PINK}─────────────────────────────────────────────────────────────${R}\n"; }
+STEP=0; TOTAL=8
+step()  { STEP=$((STEP+1)); printf "\n${B}${PINK}[%d/%d]${R} ${B}%s${R}\n" "$STEP" "$TOTAL" "$1"; }
+ok()    { printf "  ${GREEN}✓${R} %s\n" "$*"; }
+warn()  { printf "  ${YEL}!${R} %s\n" "$*"; }
+err()   { printf "  ${RED}✗${R} %s\n" "$*" >&2; }
+note()  { printf "  ${GRAY}%s${R}\n" "$*"; }
+hr()    { printf "${PINK}─────────────────────────────────────────────────────────────${R}\n"; }
+prompt(){ printf "  ${CYAN}%s${R}" "$*"; }
 
 trap 'echo; err "setup aborted"; exit 130' INT
+
+# Ensure we can read from the tty even when piped (curl | sh).
+if [[ ! -t 0 ]]; then exec </dev/tty 2>/dev/null || true; fi
 
 printf "\n${PINK}"
 cat <<'BANNER'
@@ -37,7 +42,7 @@ cat <<'BANNER'
 BANNER
 printf "${R}\n${GRAY}  a terminal AI agent that drives your Chrome from a CLI prompt.${R}\n\n"
 
-# ───── 1. system check ───────────────────────────────────────────────────────
+# ───── 1. system ─────────────────────────────────────────────────────────────
 step "checking system"
 [[ "$(uname)" == "Darwin" ]] || { err "macOS only"; exit 1; }
 ok "macOS $(sw_vers -productVersion) ($(uname -m))"
@@ -86,30 +91,40 @@ else
   exit 1
 fi
 
-# ───── 5. install binaries + LaunchAgent ─────────────────────────────────────
+# ───── 5. binaries + LaunchAgent ─────────────────────────────────────────────
 step "installing binaries + LaunchAgent"
 ./scripts/install.sh both 2>&1 | sed "s/^/  ${GRAY}|${R} /"
+TOKEN_FILE=/Users/Shared/lily/token
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  [[ -r "$TOKEN_FILE" ]] && break
+  sleep 0.3
+done
 
-# lily-chrome wrapper — relaunch Chrome with extension + saved profile.
-LILY_CHROME="$HOME/.local/bin/lily-chrome"
-cat >"$LILY_CHROME" <<EOF
-#!/usr/bin/env bash
-# Relaunch your Chrome with the Lily extension loaded into your chosen profile.
-PROFILE_CONF="\$HOME/.lily/chrome-profile.conf"
-PROFILE_ARG=""
-if [[ -r "\$PROFILE_CONF" ]]; then
-  PROFILE_DIR="\$(cat "\$PROFILE_CONF")"
-  PROFILE_ARG="--profile-directory=\$PROFILE_DIR"
-fi
-exec open -a "/Applications/Google Chrome.app" --args \\
-  \$PROFILE_ARG \\
-  --load-extension="$REPO_DIR/extension" \\
-  --no-first-run \\
-  --no-default-browser-check \\
-  "\$@"
-EOF
-chmod +x "$LILY_CHROME"
-ok "$LILY_CHROME ready"
+# Helper: hit /diagnose and return the JSON
+fetch_diag() {
+  local token
+  token="$(cat "$TOKEN_FILE" 2>/dev/null || true)"
+  [[ -z "$token" ]] && return 1
+  curl -sS -m 3 -H "Authorization: Bearer $token" http://127.0.0.1:7777/diagnose 2>/dev/null
+}
+diag_has() {
+  local key="$1" json
+  json="$(fetch_diag)" || return 1
+  [[ -z "$json" ]] && return 1
+  printf '%s' "$json" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+parts = sys.argv[1].split(".")
+v = d
+for p in parts:
+    v = v.get(p) if isinstance(v, dict) else None
+    if v is None: sys.exit(1)
+sys.exit(0 if v is True else 1)
+' "$key"
+}
 
 # ───── 6. groq key ────────────────────────────────────────────────────────────
 step "groq api key"
@@ -122,13 +137,9 @@ if has_key "$ENV_FILE"; then
 elif has_key "$SHARED_ENV"; then
   ok "key found in shared $SHARED_ENV"
 else
-  note "get a free key at https://console.groq.com/keys"
+  note "free key at https://console.groq.com/keys"
   printf "  ${CYAN}paste key (hidden):${R} "
-  if [[ -t 0 ]]; then
-    read -rs GROQ_KEY < /dev/tty || GROQ_KEY=""
-  else
-    read -rs GROQ_KEY || GROQ_KEY=""
-  fi
+  IFS= read -rs GROQ_KEY || GROQ_KEY=""
   echo
   if [[ -n "$GROQ_KEY" && "$GROQ_KEY" == gsk_* ]]; then
     mkdir -p "$HOME/.lily"; chmod 700 "$HOME/.lily" || true
@@ -136,145 +147,126 @@ else
     chmod 600 "$ENV_FILE"
     ok "saved to $ENV_FILE"
     launchctl kickstart -k "gui/$(id -u)/computer.lily.daemon" 2>/dev/null || true
+    sleep 1
   else
-    warn "skipped — drop key into $ENV_FILE later"
+    warn "no key entered — drop one into $ENV_FILE later and kickstart the daemon"
   fi
 fi
 
-# ───── 7. Chrome profile picker + extension auto-load ────────────────────────
-step "Chrome — picking profile + loading extension"
-CHROME_APP="/Applications/Google Chrome.app"
-LOCAL_STATE="$HOME/Library/Application Support/Google/Chrome/Local State"
+# ───── 7. macOS permissions ───────────────────────────────────────────────────
+step "macOS permissions"
+echo
+note "Lily needs three macOS permissions for non-browser tools (Mail,"
+note "Finder, Music, etc). The Chrome extension itself doesn't need any."
+note "I'll trigger the prompts now — click 'Allow' on each as they appear."
+echo
 
-if [[ ! -d "$CHROME_APP" ]]; then
-  warn "Google Chrome not installed at $CHROME_APP — install it, then run: lily-chrome"
-else
-  # Make sure Chrome has been launched at least once so a profile exists.
-  if [[ ! -f "$LOCAL_STATE" ]]; then
-    note "Chrome has no profile yet — launching it briefly to create one..."
-    open -a "$CHROME_APP" >/dev/null 2>&1 || true
-    for i in 1 2 3 4 5 6 7 8; do
-      [[ -f "$LOCAL_STATE" ]] && break
-      sleep 0.5
-    done
-    sleep 1
-    osascript -e 'tell application "Google Chrome" to quit' 2>/dev/null || true
-    sleep 0.5
+# Run warmup once — this triggers Screen Recording + Automation + Accessibility
+# prompts by exercising each API. macOS attributes the prompts to lilyd / osascript.
+note "▸ running:  ~/.local/bin/lilyd warmup"
+"$HOME/.local/bin/lilyd" warmup 2>&1 | sed "s/^/    ${GRAY}|${R} /"
+echo
+
+# Each permission: check live, if missing, open System Settings + tell user
+# exactly what to do, then poll for grant. User can press Enter to skip.
+check_perm() {
+  local label="$1" diag_key="$2" pane="$3" fix_msg="$4"
+  printf "  checking ${B}%s${R}... " "$label"
+  if diag_has "$diag_key"; then
+    printf "${GREEN}✓${R}\n"
+    return 0
   fi
-
-  # Enumerate profiles via Python (jq isn't guaranteed on macOS).
-  mapfile -t PROFILES < <(python3 - "$LOCAL_STATE" <<'PY' 2>/dev/null
-import json, sys
-try:
-    with open(sys.argv[1]) as f: s = json.load(f)
-    for k, v in (s.get("profile", {}) or {}).get("info_cache", {}).items():
-        name = (v or {}).get("name") or k
-        print(f"{k}\t{name}")
-except Exception:
-    pass
-PY
-)
-
-  if [[ ${#PROFILES[@]} -eq 0 ]]; then
-    warn "couldn't read Chrome profile list — defaulting to Default"
-    CHOSEN_DIR="Default"
-    CHOSEN_NAME="Default"
-  elif [[ ${#PROFILES[@]} -eq 1 ]]; then
-    IFS=$'\t' read -r CHOSEN_DIR CHOSEN_NAME <<<"${PROFILES[0]}"
-    ok "one profile found: $CHOSEN_NAME ($CHOSEN_DIR)"
+  printf "${YEL}needs grant${R}\n"
+  printf "  ${GRAY}%s${R}\n" "$fix_msg"
+  note "opening System Settings → $label..."
+  open "$pane" 2>/dev/null || true
+  printf "  ${CYAN}press Enter when granted (or 's' to skip):${R} "
+  IFS= read -r ans
+  if [[ "$ans" == "s" ]]; then warn "skipped $label"; return 1; fi
+  # Kickstart daemon so it picks up the new grant
+  launchctl kickstart -k "gui/$(id -u)/computer.lily.daemon" 2>/dev/null || true
+  sleep 1
+  if diag_has "$diag_key"; then
+    printf "  ${GREEN}✓${R} $label\n"
+    return 0
   else
-    note "found ${#PROFILES[@]} Chrome profiles. ↑↓ to select, Enter to confirm:"
-    echo
-
-    # Arrow-key picker. Draw, listen, redraw on change.
-    SEL=0
-    N=${#PROFILES[@]}
-    printf '\033[?25l'   # hide cursor
-
-    draw() {
-      for i in "${!PROFILES[@]}"; do
-        IFS=$'\t' read -r dir name <<<"${PROFILES[$i]}"
-        if [[ $i -eq $SEL ]]; then
-          printf "  ${PINK}▸${R} ${B}%s${R}  ${GRAY}(%s)${R}\n" "$name" "$dir"
-        else
-          printf "    %s  ${GRAY}(%s)${R}\n" "$name" "$dir"
-        fi
-      done
-    }
-
-    clear_lines() {
-      for ((i=0; i<N; i++)); do printf '\033[1A\033[2K'; done
-    }
-
-    draw
-    while true; do
-      IFS= read -rsn1 ch
-      if [[ $ch == $'\x1b' ]]; then
-        read -rsn2 -t 0.1 ch || true
-        case $ch in
-          '[A') ((SEL > 0)) && ((SEL--)) ;;
-          '[B') ((SEL < N - 1)) && ((SEL++)) ;;
-        esac
-        clear_lines; draw
-      elif [[ -z $ch || $ch == $'\n' ]]; then
-        break
-      fi
-    done
-    printf '\033[?25h'
-
-    IFS=$'\t' read -r CHOSEN_DIR CHOSEN_NAME <<<"${PROFILES[$SEL]}"
-    ok "using profile: $CHOSEN_NAME ($CHOSEN_DIR)"
+    warn "$label still missing — run scripts/doctor.sh later"
+    return 1
   fi
+}
 
-  # Save choice so lily-chrome reuses it later.
-  mkdir -p "$HOME/.lily"
-  printf '%s\n' "$CHOSEN_DIR" > "$HOME/.lily/chrome-profile.conf"
+check_perm "Screen Recording" \
+  "screen_recording.ok" \
+  "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture" \
+  "add ~/.local/bin/lilyd to the list, toggle ON"
 
-  # Quit Chrome if running, then relaunch with extension preloaded.
-  if pgrep -x "Google Chrome" >/dev/null; then
-    note "quitting Chrome to reload with extension..."
-    osascript -e 'tell application "Google Chrome" to quit' 2>/dev/null || true
-    for i in 1 2 3 4 5 6 7 8; do
-      pgrep -x "Google Chrome" >/dev/null || break
-      sleep 0.5
-    done
+check_perm "Automation (System Events)" \
+  "automation_system_events.ok" \
+  "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation" \
+  "expand osascript / lilyd, check 'System Events'"
+
+check_perm "Accessibility (for osascript)" \
+  "accessibility.ok" \
+  "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" \
+  "click +, ⌘⇧G, paste /usr/bin/osascript, toggle ON"
+
+# ───── 8. Chrome extension via Load Unpacked ─────────────────────────────────
+step "Chrome extension"
+EXT_DIR="$REPO_DIR/extension"
+echo
+note "now Chrome. The extension lives at:"
+echo
+printf "    ${B}${CYAN}%s${R}\n" "$EXT_DIR"
+echo
+note "I'm going to open chrome://extensions for you. There:"
+note "  1) toggle ${B}Developer mode${R} (top-right corner)"
+note "  2) click ${B}Load unpacked${R}"
+note "  3) pick the folder above (copy/paste it into the Open dialog if easier)"
+echo
+# Try to put the path on the clipboard so the user can ⌘V it into the Open dialog
+if command -v pbcopy >/dev/null 2>&1; then
+  printf '%s' "$EXT_DIR" | pbcopy 2>/dev/null && note "(folder path copied to clipboard — paste into the Open dialog)"
+fi
+echo
+
+# Open chrome://extensions
+if [[ -d "/Applications/Google Chrome.app" ]]; then
+  open -a "Google Chrome" "chrome://extensions" 2>/dev/null \
+    || open "chrome://extensions" 2>/dev/null \
+    || true
+  ok "chrome://extensions opened"
+else
+  warn "Google Chrome not in /Applications — install Chrome, then visit chrome://extensions and Load unpacked from the path above"
+fi
+
+# Poll for the extension to actually connect over the WebSocket bridge.
+echo
+note "waiting for the extension to connect..."
+EXT_OK=""
+for i in $(seq 1 120); do  # up to ~120s
+  if diag_has "browser_extension.connected"; then
+    EXT_OK=1
+    break
   fi
-
-  EXT_DIR="$REPO_DIR/extension"
-  open -a "$CHROME_APP" --args \
-    --profile-directory="$CHOSEN_DIR" \
-    --load-extension="$EXT_DIR" \
-    --no-first-run \
-    --no-default-browser-check 2>/dev/null || true
-  ok "Chrome relaunched with extension loaded into '$CHOSEN_NAME'"
-
-  # Verify connection.
-  TOKEN="$(cat /Users/Shared/lily/token 2>/dev/null || true)"
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    if [[ -n "$TOKEN" ]] && curl -sS -m 1 -H "Authorization: Bearer $TOKEN" \
-       http://127.0.0.1:7777/diagnose 2>/dev/null \
-       | grep -q '"browser_extension"[^}]*"connected":true'; then
-      ok "extension connected to lilyd"
-      EXT_OK=1
-      break
-    fi
-    sleep 0.5
-  done
-  if [[ -z "${EXT_OK:-}" ]]; then
-    warn "extension didn't connect within 5s — Chrome should have it but it's slow to register"
-    note "give it 10s, then: $REPO_DIR/scripts/doctor.sh"
+  if (( i % 10 == 0 )); then
+    note "  still waiting (${i}s)... if you haven't yet, click Load unpacked + pick the folder above"
   fi
+  sleep 1
+done
+
+if [[ -n "$EXT_OK" ]]; then
+  ok "Chrome extension connected to lilyd"
+else
+  warn "extension still not connected — that's OK, you can finish loading later."
+  note "after Load unpacked, re-run:  $REPO_DIR/scripts/doctor.sh"
 fi
 
 # ───── done ──────────────────────────────────────────────────────────────────
 echo
 hr
 printf "  ${B}lily computer is ready.${R}\n\n"
-printf "  ${B}lily${R}            ${GRAY}# launch the TUI${R}\n"
-printf "  ${B}lc${R}              ${GRAY}# shorter alias${R}\n"
-printf "  ${B}lily-chrome${R}     ${GRAY}# relaunch Chrome with extension if you closed it${R}\n\n"
-printf "  ${GRAY}for the extension to load every time you open Chrome, use ${B}lily-chrome${R}${GRAY},${R}\n"
-printf "  ${GRAY}or just launch Chrome normally — the extension persists for THIS session.${R}\n"
+printf "  ${B}lily${R}      ${GRAY}# the TUI${R}\n"
+printf "  ${B}lc${R}        ${GRAY}# shorter alias${R}\n\n"
 printf "  ${GRAY}troubleshoot:  $REPO_DIR/scripts/doctor.sh${R}\n"
 hr
 echo
