@@ -41,8 +41,13 @@ prompt(){ printf "  ${CYAN}%s${R}" "$*"; }
 
 trap 'echo; err "setup aborted"; exit 130' INT
 
-# Ensure we can read from the tty even when piped (curl | sh).
-if [[ ! -t 0 ]]; then exec </dev/tty 2>/dev/null || true; fi
+# DON'T do `exec </dev/tty` at script level here — when bash is reading the
+# script from a pipe (curl | sh), that command swaps stdin mid-parse and bash
+# starts trying to read the REST OF THE SCRIPT from your terminal. The script
+# appears to hang. Instead, the few `read` calls below explicitly redirect
+# their own stdin from /dev/tty.
+TTY="/dev/tty"
+[[ -r "$TTY" && -w "$TTY" ]] || TTY=""
 
 printf "\n${PINK}"
 cat <<'BANNER'
@@ -177,7 +182,12 @@ elif has_key "$SHARED_ENV"; then
 else
   note "free key at https://console.groq.com/keys"
   printf "  ${CYAN}paste key (hidden):${R} "
-  IFS= read -rs GROQ_KEY || GROQ_KEY=""
+  if [[ -n "$TTY" ]]; then
+    IFS= read -rs GROQ_KEY <"$TTY" || GROQ_KEY=""
+  else
+    GROQ_KEY=""
+    warn "no terminal attached — skipping key prompt"
+  fi
   echo
   if [[ -n "$GROQ_KEY" && "$GROQ_KEY" == gsk_* ]]; then
     mkdir -p "$HOME/.lily"; chmod 700 "$HOME/.lily" || true
@@ -219,7 +229,12 @@ check_perm() {
   note "opening System Settings → $label..."
   open "$pane" 2>/dev/null || true
   printf "  ${CYAN}press Enter when granted (or 's' to skip):${R} "
-  IFS= read -r ans
+  ans=""
+  if [[ -n "$TTY" ]]; then
+    IFS= read -r ans <"$TTY" || ans=""
+  else
+    warn "no terminal — auto-skipping $label"; return 1
+  fi
   if [[ "$ans" == "s" ]]; then warn "skipped $label"; return 1; fi
   # Kickstart daemon so it picks up the new grant
   launchctl kickstart -k "gui/$(id -u)/computer.lily.daemon" 2>/dev/null || true
