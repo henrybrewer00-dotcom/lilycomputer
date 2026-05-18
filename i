@@ -197,8 +197,9 @@ if has_key "$ENV_FILE"; then
 elif has_key "$SHARED_ENV"; then
   ok "key found in shared $SHARED_ENV"
 else
-  note "free key at https://console.groq.com/keys"
-  printf "  ${CYAN}paste key (hidden):${R} "
+  note "Lily uses Groq's API to think. Free tier is fine."
+  note "Get one at:  https://console.groq.com/keys"
+  printf "  ${CYAN}paste key (hidden), or press Enter to skip:${R} "
   if [[ -n "$TTY" ]]; then
     IFS= read -rs GROQ_KEY <"$TTY" || GROQ_KEY=""
   else
@@ -206,15 +207,20 @@ else
     warn "no terminal attached — skipping key prompt"
   fi
   echo
+  mkdir -p "$HOME/.lily"; chmod 700 "$HOME/.lily" 2>/dev/null || true
   if [[ -n "$GROQ_KEY" && "$GROQ_KEY" == gsk_* ]]; then
-    mkdir -p "$HOME/.lily"; chmod 700 "$HOME/.lily" || true
     printf 'GROQ_API_KEY=%s\n' "$GROQ_KEY" > "$ENV_FILE"
     chmod 600 "$ENV_FILE"
     ok "saved to $ENV_FILE"
     launchctl kickstart -k "gui/$(id -u)/computer.lily.daemon" 2>/dev/null || true
     sleep 1
+  elif [[ -n "$GROQ_KEY" ]]; then
+    warn "doesn't look like a Groq key (should start with gsk_) — skipping"
+    note "lily will ask you again when you send your first message"
+    : > "$ENV_FILE"
   else
-    warn "no key entered — drop one into $ENV_FILE later and kickstart the daemon"
+    note "skipped — lily will ask for it on the client side when you send your first message"
+    : > "$ENV_FILE"   # empty file so daemon still starts cleanly
   fi
 fi
 
@@ -284,23 +290,28 @@ check_perm "Accessibility (for osascript)" \
 step "Chrome extension"
 EXT_DIR="$REPO_DIR/extension"
 echo
-note "now Chrome. The extension lives at:"
+note "the Lily extension lets the daemon control Chrome. Its folder is:"
 echo
 printf "    ${B}${CYAN}%s${R}\n" "$EXT_DIR"
 echo
 # Try to put the path on the clipboard so the user can ⌘V it into the Open dialog
 if command -v pbcopy >/dev/null 2>&1; then
-  printf '%s' "$EXT_DIR" | pbcopy 2>/dev/null && note "(folder path copied to clipboard — paste into Chrome's Open dialog with ⌘V)"
+  if printf '%s' "$EXT_DIR" | pbcopy 2>/dev/null; then
+    ok "folder path copied to your clipboard (you'll paste it into Chrome with ⌘V)"
+  fi
 fi
 echo
 
-# Open chrome://extensions — try several methods because `open` is flaky
-# with chrome:// URLs and behavior depends on whether Chrome is already
-# running, whether it's the default browser, and macOS version.
-chrome_open() {
-  local url="$1" opened=""
+# Pause #1 — let the user read the path before Chrome takes focus.
+printf "  ${CYAN}press Enter to open Chrome →${R} "
+[[ -n "$TTY" ]] && IFS= read -r _ <"$TTY" || true
+echo
 
-  # Method 1: AppleScript (most reliable when Automation perm is granted).
+# Try several methods because `open` is flaky with chrome:// URLs.
+chrome_open() {
+  local url="$1"
+
+  # Method 1: AppleScript (most reliable when Automation is granted).
   if osascript >/dev/null 2>&1 <<APPLESCRIPT
 tell application "Google Chrome"
   activate
@@ -310,45 +321,40 @@ end tell
 APPLESCRIPT
   then return 0; fi
 
-  # Method 2: launch (or focus) Chrome and pass the URL as an arg.
-  if open -a "Google Chrome" --args "$url" 2>/dev/null; then return 0; fi
-
-  # Method 3: cold-start a new Chrome instance with the URL.
-  if open -na "Google Chrome" --args "$url" 2>/dev/null; then return 0; fi
-
+  open -a "Google Chrome" --args "$url" 2>/dev/null && return 0
+  open -na "Google Chrome" --args "$url" 2>/dev/null && return 0
   return 1
 }
 
 if [[ ! -d "/Applications/Google Chrome.app" ]]; then
-  warn "Google Chrome not at /Applications/Google Chrome.app"
-  warn "Install Chrome, then open chrome://extensions and Load unpacked from the path above"
+  warn "Google Chrome not at /Applications/Google Chrome.app — install Chrome then"
+  warn "manually visit chrome://extensions and Load unpacked from the path above"
 else
-  note "▸ opening Chrome → chrome://extensions ..."
   if chrome_open "chrome://extensions"; then
-    ok "Chrome opened — find the chrome://extensions tab (may be in the background)"
+    ok "Chrome should now be at chrome://extensions"
   else
-    err "couldn't auto-open Chrome from this session"
-    warn "open Chrome yourself, paste ${B}chrome://extensions${R} in the address bar"
+    warn "couldn't auto-open Chrome — open it yourself and visit chrome://extensions"
   fi
 fi
 
 echo
-note "In the chrome://extensions tab:"
-note "  1. toggle ${B}Developer mode${R} (top-right corner)"
+note "In Chrome, do these three things:"
+note "  1. toggle ${B}Developer mode${R}  ${GRAY}(top-right corner)${R}"
 note "  2. click ${B}Load unpacked${R}"
-note "  3. paste the folder above (⌘V) into the Open dialog → Open"
-
-# Poll for the extension to actually connect over the WebSocket bridge.
+note "  3. paste the folder path (⌘V) and click ${B}Open${R}"
 echo
-note "waiting for the extension to connect..."
+
+# Pause #2 — wait for the user to do the load, then verify.
+printf "  ${CYAN}press Enter when the extension is loaded →${R} "
+[[ -n "$TTY" ]] && IFS= read -r _ <"$TTY" || true
+echo
+
+note "verifying the extension connected..."
 EXT_OK=""
-for i in $(seq 1 120); do  # up to ~120s
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do  # ~12 × 1s = 12s
   if diag_has "browser_extension.connected"; then
     EXT_OK=1
     break
-  fi
-  if (( i % 10 == 0 )); then
-    note "  still waiting (${i}s)... if you haven't yet, click Load unpacked + pick the folder above"
   fi
   sleep 1
 done
@@ -356,8 +362,38 @@ done
 if [[ -n "$EXT_OK" ]]; then
   ok "Chrome extension connected to lilyd"
 else
-  warn "extension still not connected — that's OK, you can finish loading later."
-  note "after Load unpacked, re-run:  $REPO_DIR/scripts/doctor.sh"
+  warn "still not connected — the extension may not have loaded successfully"
+  note "open chrome://extensions and verify 'Lily Computer' is enabled"
+  note "you can re-verify later with:  $REPO_DIR/scripts/doctor.sh"
+fi
+
+# ───── final summary ─────────────────────────────────────────────────────────
+echo
+hr
+printf "  ${B}final checks${R}\n\n"
+TOKEN_VAL="$(cat "$TOKEN_FILE" 2>/dev/null || true)"
+HEALTH="$(curl -sS -m 3 -H "Authorization: Bearer $TOKEN_VAL" http://127.0.0.1:7777/health 2>/dev/null || true)"
+if [[ "$HEALTH" == *'"ok":true'* ]]; then
+  printf "  ${GREEN}✓${R} daemon healthy\n"
+else
+  printf "  ${RED}✗${R} daemon not responding\n"
+fi
+summarize() {
+  local label="$1" key="$2"
+  if diag_has "$key"; then
+    printf "  ${GREEN}✓${R} %s\n" "$label"
+  else
+    printf "  ${YEL}!${R} %s ${GRAY}(skipped or denied — OK if you don't use this)${R}\n" "$label"
+  fi
+}
+summarize "Screen Recording" "screen_recording.ok"
+summarize "Automation"       "automation_system_events.ok"
+summarize "Accessibility"    "accessibility.ok"
+summarize "Chrome extension" "browser_extension.connected"
+if has_key "$ENV_FILE" || has_key "$SHARED_ENV"; then
+  printf "  ${GREEN}✓${R} Groq API key\n"
+else
+  printf "  ${YEL}!${R} Groq API key ${GRAY}(skipped — lily will ask on first message)${R}\n"
 fi
 
 # ───── done ──────────────────────────────────────────────────────────────────

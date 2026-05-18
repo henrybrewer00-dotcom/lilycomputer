@@ -18,7 +18,8 @@ pub const SERVICE_TIER: &str = "on_demand";
 #[derive(Clone)]
 pub struct AppState {
     pub token: String,
-    pub groq_key: String,
+    /// Optional — daemon now starts without it and accepts the key later via POST /set-key.
+    pub groq_key: Arc<tokio::sync::RwLock<Option<String>>>,
     pub started: Instant,
     pub session: Arc<Mutex<Option<Session>>>,
     pub history: Arc<Mutex<history::History>>,
@@ -70,14 +71,22 @@ async fn main() -> Result<()> {
         .init();
 
     let token = lily_core::config::load_or_create_token(true)?;
-    let groq_key = lily_core::config::load_groq_key()?;
+    // Don't bail when the key is missing — the daemon should still start so
+    // the TUI can connect and prompt the user inline.
+    let groq_key_opt = match lily_core::config::load_groq_key() {
+        Ok(k) => Some(k),
+        Err(e) => {
+            tracing::warn!("starting without GROQ_API_KEY: {e}");
+            None
+        }
+    };
 
     let (tx, _) = broadcast::channel(256);
     let history = history::History::load();
     tracing::info!("history: {} messages loaded", history.messages.len());
     let state = AppState {
         token,
-        groq_key,
+        groq_key: Arc::new(tokio::sync::RwLock::new(groq_key_opt)),
         started: Instant::now(),
         session: Arc::new(Mutex::new(None)),
         history: Arc::new(Mutex::new(history)),

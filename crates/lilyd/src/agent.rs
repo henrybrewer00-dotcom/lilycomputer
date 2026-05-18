@@ -80,7 +80,15 @@ pub async fn run(state: AppState, session_id: String, prompt: String, cancel: To
             stream: false,
         };
 
-        let resp = match groq::chat(&state.http, &state.groq_key, &req).await {
+        let key = state.groq_key.read().await.clone();
+        let Some(key) = key else {
+            let _ = tx.send(Event::Error {
+                message: "GROQ_API_KEY not configured. Paste your key into the prompt and the daemon will pick it up.".into(),
+            });
+            let _ = tx.send(Event::Done { summary: "needs-groq-key".into() });
+            break;
+        };
+        let resp = match groq::chat(&state.http, &key, &req).await {
             Ok(r) => r,
             Err(e) => {
                 let _ = tx.send(Event::Error { message: format!("groq error: {e}") });

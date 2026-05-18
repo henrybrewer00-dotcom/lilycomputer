@@ -3,7 +3,7 @@ use eventsource_stream::Eventsource;
 use futures::stream::Stream;
 use futures_util::StreamExt;
 use lily_core::protocol::{
-    CancelRequest, Event as LilyEvent, HealthResponse, RunRequest, RunResponse,
+    CancelRequest, Event as LilyEvent, HealthResponse, RunRequest, RunResponse, SetKeyRequest,
 };
 use reqwest::header::AUTHORIZATION;
 use std::pin::Pin;
@@ -79,6 +79,21 @@ impl DaemonClient {
             .header(AUTHORIZATION, self.auth())
             .send()
             .await?;
+        Ok(())
+    }
+
+    pub async fn set_key(&self, groq_api_key: String) -> Result<()> {
+        let req = SetKeyRequest { groq_api_key };
+        let resp = self
+            .http
+            .post(format!("{}/set-key", self.base))
+            .header(AUTHORIZATION, self.auth())
+            .json(&req)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            anyhow::bail!("/set-key: {}", resp.text().await.unwrap_or_default());
+        }
         Ok(())
     }
 

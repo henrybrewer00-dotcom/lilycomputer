@@ -1,4 +1,5 @@
 use crate::app::{AppState, Line};
+use crate::settings::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -8,6 +9,32 @@ use ratatui::{
 };
 
 const ACCENT: Color = Color::Rgb(236, 72, 153); // hot pink — Lily
+
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+struct Palette {
+    accent: Color,
+    fg: Color,
+    fg_dim: Color,
+    border: Color,
+}
+
+fn palette(theme: Theme) -> Palette {
+    match theme {
+        Theme::Dark => Palette {
+            accent: ACCENT,
+            fg: Color::White,
+            fg_dim: Color::Gray,
+            border: Color::DarkGray,
+        },
+        Theme::Light => Palette {
+            accent: ACCENT,
+            fg: Color::Black,
+            fg_dim: Color::DarkGray,
+            border: Color::Gray,
+        },
+    }
+}
 
 pub fn draw(f: &mut Frame, state: &AppState) {
     let size = f.area();
@@ -22,9 +49,45 @@ pub fn draw(f: &mut Frame, state: &AppState) {
         .split(size);
 
     draw_header(f, chunks[0], state);
-    draw_log(f, chunks[1], state);
+    if state.settings_open {
+        draw_settings(f, chunks[1], state);
+    } else {
+        draw_log(f, chunks[1], state);
+    }
     draw_input(f, chunks[2], state);
     draw_footer(f, chunks[3], state);
+}
+
+fn draw_settings(f: &mut Frame, area: Rect, state: &AppState) {
+    use crate::settings::Field;
+    let p = palette(state.settings.theme);
+    let fields = Field::all();
+    let mut tlines: Vec<TLine> = Vec::new();
+    tlines.push(TLine::from(""));
+    tlines.push(TLine::from(vec![
+        Span::raw("  "),
+        Span::styled("settings", Style::default().fg(p.accent).add_modifier(Modifier::BOLD)),
+        Span::raw("   "),
+        Span::styled("↑↓ select · Enter toggle · Esc close", Style::default().fg(p.fg_dim)),
+    ]));
+    tlines.push(TLine::from(""));
+    for (i, f_) in fields.iter().enumerate() {
+        let marker = if i == state.settings_cursor { "▸" } else { " " };
+        let label_style = if i == state.settings_cursor {
+            Style::default().fg(p.fg).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(p.fg)
+        };
+        tlines.push(TLine::from(vec![
+            Span::raw("  "),
+            Span::styled(marker.to_string(), Style::default().fg(p.accent)),
+            Span::raw(" "),
+            Span::styled(format!("{:<40}", f_.label()), label_style),
+            Span::styled(f_.value_text(&state.settings), Style::default().fg(p.accent)),
+        ]));
+    }
+    let p_widget = Paragraph::new(tlines).wrap(Wrap { trim: false });
+    f.render_widget(p_widget, area);
 }
 
 fn draw_header(f: &mut Frame, area: Rect, state: &AppState) {

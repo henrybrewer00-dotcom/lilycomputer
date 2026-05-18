@@ -23,34 +23,46 @@ your computer.
 └─ ⏱ 3.1s · 4 tools · 2,840 tok · ⌃C cancel · ⌃R clear · /help ──────┘
 ```
 
-## Install — one short command
+## Install
 
-**Single-user** (one Mac account does it all):
+> **Heads up:** if you want dual-user mode (Lily drives a separate macOS
+> account while you keep using yours), you have to run the installer on
+> **both** accounts — different command on each. Same Mac, just one
+> Fast-User-Switch between them. See the two boxes below.
+
+### Single-user (simplest)
+
+One Mac account runs everything. Lily acts on the same screen you're using.
 
 ```bash
 curl -L tinyurl.com/lily-get|sh
 ```
 
-That installs Rust if needed, builds, registers `lilyd` as a LaunchAgent,
-asks for your Groq key, walks you through the three macOS permissions
-(opening each Privacy pane in turn), copies the extension folder path to
-your clipboard, and opens `chrome://extensions` so you can Load Unpacked
-in two clicks. ~90 seconds total.
+The installer (an interactive step-by-step in your terminal) installs Rust if
+needed, builds, registers `lilyd` as a LaunchAgent, asks for your Groq key
+(skippable — Lily will ask again on first message), walks you 1-by-1 through
+the three macOS permissions, then pauses while you load the Chrome extension
+via `chrome://extensions → Load unpacked`. ~90 seconds total.
 
-**Dual-user** (one Mac account runs the daemon + Chrome, another runs the TUI).
-Same installer, run on each account:
+### Dual-user
+
+**Run this on the assistant** (Fast User Switch into that account first):
 
 ```bash
-# On the assistant (the account that drives Chrome — Fast User Switch here first)
 curl -L tinyurl.com/lily-get|sh
+```
 
-# On the client (your normal account, where you type prompts)
+Full assistant install. Same flow as single-user.
+
+**Run this on the client** (your normal account, where you'll type prompts):
+
+```bash
 curl -L tinyurl.com/lily-get|sh -s client
 ```
 
-`-s client` is a ~15-second variant that just installs the `lily` TUI
-binary — no daemon, no Chrome, no perms. It talks to the assistant's
-`lilyd` over machine-local loopback (`127.0.0.1:7777`).
+~15 seconds. Just the `lily` TUI binary + `lc` alias. No daemon, no Chrome,
+no perms. It talks to the assistant's `lilyd` over machine-local loopback
+(`127.0.0.1:7777`).
 
 See [SETUP.md](SETUP.md) for the full step-by-step on each side.
 

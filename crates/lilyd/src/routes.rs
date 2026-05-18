@@ -14,7 +14,7 @@ use axum::{
 };
 use futures::{stream::Stream, SinkExt, StreamExt};
 use lily_core::protocol::{
-    CancelRequest, Event as LilyEvent, HealthResponse, RunRequest, RunResponse,
+    CancelRequest, Event as LilyEvent, HealthResponse, RunRequest, RunResponse, SetKeyRequest,
 };
 use serde::Deserialize;
 use std::{convert::Infallible, time::Duration};
@@ -26,6 +26,7 @@ pub fn router(state: AppState) -> Router {
         .route("/cancel", post(cancel))
         .route("/reset", post(reset))
         .route("/diagnose", get(diagnose))
+        .route("/set-key", post(set_key))
         .route("/stream", get(stream))
         .route("/ws/chrome", get(ws_chrome))
         .layer(axum::middleware::from_fn_with_state(
@@ -80,11 +81,13 @@ async fn handle_chrome_ws(socket: WebSocket, state: AppState) {
 }
 
 async fn health(State(state): State<AppState>) -> impl IntoResponse {
+    let groq_configured = state.groq_key.read().await.is_some();
     let resp = HealthResponse {
         ok: true,
         version: env!("CARGO_PKG_VERSION").to_string(),
         uptime_s: state.started.elapsed().as_secs(),
         model: MODEL.to_string(),
+        groq_configured,
     };
     Json(resp)
 }
@@ -129,6 +132,31 @@ async fn run(
 async fn reset(State(state): State<AppState>) -> impl IntoResponse {
     state.history.lock().await.reset();
     (StatusCode::OK, "memory cleared")
+}
+
+async fn set_key(
+    State(state): State<AppState>,
+    Json(body): Json<SetKeyRequest>,
+) -> impl IntoResponse {
+    let key = body.groq_api_key.trim().to_string();
+    if !key.starts_with("gsk_") || key.len() < 20 {
+        return (StatusCode::BAD_REQUEST, "key must start with gsk_");
+    }
+    // Persist to ~/.lily/env so the daemon picks it up on restart.
+    let env_path = lily_core::config::user_env_path();
+    if let Some(parent) = env_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&env_path, format!("GROQ_API_KEY={key}\n"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600));
+    }
+    // Update the live in-memory state too.
+    *state.groq_key.write().await = Some(key);
+    tracing::info!("groq key set via /set-key");
+    (StatusCode::OK, "key accepted")
 }
 
 async fn cancel(

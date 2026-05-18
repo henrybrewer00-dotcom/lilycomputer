@@ -39,23 +39,33 @@ pub struct AppState {
     pub latest_shot: Option<(String, u32)>,
     pub auto_view: bool,
     pub last_auto_viewed: Option<u32>,
+    pub settings: crate::settings::Settings,
+    pub settings_open: bool,
+    pub settings_cursor: usize,
+    pub intro_started: Option<Instant>,
+    pub intro_lines_shown: usize,
     pub quit: bool,
 }
 
 impl AppState {
     pub fn new(client: DaemonClient) -> Self {
+        let settings = crate::settings::Settings::load();
+        // If intro animation is on, start with empty lines — they reveal one
+        // per tick. Otherwise pre-populate with the full banner.
         let mut lines: Vec<Line> = Vec::new();
-        for l in crate::BANNER.lines() {
-            lines.push(Line::Banner { text: l.to_string() });
-        }
-        lines.push(Line::Banner { text: String::new() });
-        lines.push(Line::Info {
-            text: "ask from terminal — Lily drives the other macOS user. /help · /view · /autoview · /clear · /exit".into(),
-        });
-        lines.push(Line::Info {
-            text: "your mouse stays yours · screenshots are saved to /Users/Shared/lily/shots/".into(),
-        });
-        lines.push(Line::Info { text: "".into() });
+        let intro_started = if settings.intro_animation {
+            Some(Instant::now())
+        } else {
+            for l in crate::BANNER.lines() {
+                lines.push(Line::Banner { text: l.to_string() });
+            }
+            lines.push(Line::Banner { text: String::new() });
+            lines.push(Line::Info {
+                text: "ask from terminal — Lily drives Chrome and macOS apps. /help · /settings · /clear".into(),
+            });
+            lines.push(Line::Info { text: "".into() });
+            None
+        };
         Self {
             client,
             input: String::new(),
@@ -70,9 +80,39 @@ impl AppState {
             last_status: "idle".into(),
             spinner_frame: 0,
             latest_shot: None,
-            auto_view: false,
+            auto_view: settings.auto_view_screenshots,
             last_auto_viewed: None,
+            settings,
+            settings_open: false,
+            settings_cursor: 0,
+            intro_started,
+            intro_lines_shown: 0,
             quit: false,
+        }
+    }
+
+    /// Drive the intro animation: reveal one banner line every 60ms until done.
+    pub fn tick_intro(&mut self) {
+        let Some(started) = self.intro_started else { return; };
+        let banner_lines: Vec<&str> = crate::BANNER.lines().collect();
+        let total = banner_lines.len() + 2; // banner + 2 info lines
+        let elapsed_ms = started.elapsed().as_millis();
+        let target = ((elapsed_ms / 60) as usize).min(total);
+        while self.intro_lines_shown < target {
+            let idx = self.intro_lines_shown;
+            if idx < banner_lines.len() {
+                self.lines.push(Line::Banner { text: banner_lines[idx].to_string() });
+            } else if idx == banner_lines.len() {
+                self.lines.push(Line::Banner { text: String::new() });
+            } else {
+                self.lines.push(Line::Info {
+                    text: "ask from terminal — Lily drives Chrome and macOS apps. /help · /settings · /clear".into(),
+                });
+            }
+            self.intro_lines_shown += 1;
+        }
+        if self.intro_lines_shown >= total {
+            self.intro_started = None; // done
         }
     }
 }
@@ -125,6 +165,7 @@ pub async fn run<B: Backend>(
                 for ln in state.lines.iter_mut() {
                     if let Line::PendingTool { frame, .. } = ln { *frame = frame.wrapping_add(1); }
                 }
+                state.tick_intro();
             }
         }
     }
@@ -135,6 +176,31 @@ async fn handle_terminal_event(state: &mut AppState, ev: CtEvent) -> Result<()> 
     let CtEvent::Key(k) = ev else { return Ok(()); };
     if k.kind != KeyEventKind::Press { return Ok(()); }
     let KeyEvent { code, modifiers, .. } = k;
+
+    // Settings overlay captures keys before normal handling.
+    if state.settings_open {
+        use crate::settings::Field;
+        let fields = Field::all();
+        match code {
+            KeyCode::Esc | KeyCode::Char('q') => {
+                state.settings_open = false;
+                state.lines.push(Line::Info { text: "settings saved".into() });
+            }
+            KeyCode::Up => {
+                if state.settings_cursor > 0 { state.settings_cursor -= 1; }
+            }
+            KeyCode::Down => {
+                if state.settings_cursor + 1 < fields.len() { state.settings_cursor += 1; }
+            }
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                fields[state.settings_cursor].toggle(&mut state.settings);
+                state.auto_view = state.settings.auto_view_screenshots;
+                state.settings.save();
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
 
     let ctrl = modifiers.contains(KeyModifiers::CONTROL);
     match (code, ctrl) {
@@ -254,6 +320,10 @@ async fn handle_slash(state: &mut AppState, cmd: &str) {
                 Err(e) => state.lines.push(Line::Error { message: format!("diagnose: {e}") }),
             }
         }
+        "settings" | "config" | "prefs" => {
+            state.settings_open = true;
+            state.settings_cursor = 0;
+        }
         "exit" | "quit" | "q" => { state.quit = true; }
         "" => {}
         _ => {
@@ -267,6 +337,7 @@ async fn handle_slash(state: &mut AppState, cmd: &str) {
 }
 
 const HELP_TEXT: &str = "  /help              show this help
+  /settings          open the settings panel (↑↓ Enter to toggle, Esc to close)
   /clear             clear the screen and reset Lily's memory
   /view              open the latest screenshot in Preview
   /autoview          toggle: auto-open each new screenshot in Preview

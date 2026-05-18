@@ -25,6 +25,13 @@ pub struct HealthResponse {
     pub version: String,
     pub uptime_s: u64,
     pub model: String,
+    #[serde(default)]
+    pub groq_configured: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetKeyRequest {
+    pub groq_api_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

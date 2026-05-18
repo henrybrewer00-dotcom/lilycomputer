@@ -1,5 +1,6 @@
 mod app;
 mod client;
+mod settings;
 mod ui;
 
 use anyhow::Result;
@@ -69,12 +70,40 @@ async fn main() -> Result<()> {
 
     let client = client::DaemonClient::new(lily_core::daemon_base_url(), token);
     // Quick health probe up-front for a clearer error.
-    if let Err(e) = client.health().await {
-        eprintln!("\n  lily: cannot reach lilyd at {} — {e}\n", lily_core::daemon_base_url());
-        eprintln!("  Is lilyd running on this machine?");
-        eprintln!("  Try:  launchctl print gui/$(id -u)/computer.lily.daemon");
-        eprintln!("  Or run `~/.local/bin/lilyd` directly to debug.");
-        std::process::exit(2);
+    let health = match client.health().await {
+        Ok(h) => h,
+        Err(e) => {
+            eprintln!("\n  lily: cannot reach lilyd at {} — {e}\n", lily_core::daemon_base_url());
+            eprintln!("  Is lilyd running on this machine?");
+            eprintln!("  Try:  launchctl print gui/$(id -u)/computer.lily.daemon");
+            eprintln!("  Or run `~/.local/bin/lilyd` directly to debug.");
+            std::process::exit(2);
+        }
+    };
+
+    // If the daemon hasn't been given a Groq key yet, prompt inline before
+    // entering the TUI. The installer can skip this step intentionally; this
+    // is where we pick it up.
+    if !health.groq_configured {
+        eprintln!();
+        eprintln!("  Lily needs your Groq API key to think. Free key at:");
+        eprintln!("  https://console.groq.com/keys");
+        eprintln!();
+        eprint!("  paste key (hidden), or Enter to skip: ");
+        use std::io::Write;
+        std::io::stderr().flush().ok();
+        let key = read_password_line().unwrap_or_default();
+        let key = key.trim().to_string();
+        if key.starts_with("gsk_") && key.len() >= 20 {
+            match client.set_key(key).await {
+                Ok(_) => eprintln!("  ✓ key saved.\n"),
+                Err(e) => eprintln!("  ✗ couldn't save key: {e}\n"),
+            }
+        } else if !key.is_empty() {
+            eprintln!("  that doesn't look like a Groq key — continuing without it.\n");
+        } else {
+            eprintln!("  (skipped — Lily can't think until you set GROQ_API_KEY)\n");
+        }
     }
 
     // --once: run prompt, stream until Done, exit.
@@ -108,6 +137,18 @@ async fn main() -> Result<()> {
         std::process::exit(1);
     }
     Ok(())
+}
+
+/// Read a line from stdin with terminal echo disabled (best-effort via stty).
+fn read_password_line() -> std::io::Result<String> {
+    use std::io::BufRead;
+    let _ = std::process::Command::new("stty").arg("-echo").status();
+    let mut s = String::new();
+    let res = std::io::stdin().lock().read_line(&mut s);
+    let _ = std::process::Command::new("stty").arg("echo").status();
+    eprintln!();
+    res?;
+    Ok(s.trim_end_matches('\n').to_string())
 }
 
 async fn run_once(client: &client::DaemonClient, prompt: String) -> Result<()> {
