@@ -80,10 +80,20 @@ fi
 
 # ───── 3. source ──────────────────────────────────────────────────────────────
 step "fetching lilycomputer"
+REPO_DIR=""
+# Prefer the current dir only if it looks like a clone AND we can write into it.
+# Otherwise — including the case where you're in another user's checkout — fall
+# back to $HOME/lilycomputer.
 if [[ -f "$(pwd)/i" && -f "$(pwd)/Cargo.toml" && -d "$(pwd)/crates" ]]; then
-  REPO_DIR="$(pwd)"
-  ok "using current clone at $REPO_DIR"
-else
+  if [[ -w "$(pwd)" ]]; then
+    REPO_DIR="$(pwd)"
+    ok "using current clone at $REPO_DIR"
+  else
+    warn "current dir $(pwd) is not writable as $(id -un)"
+    note "(probably another user's checkout) — falling back to \$HOME"
+  fi
+fi
+if [[ -z "$REPO_DIR" ]]; then
   REPO_DIR="$HOME/lilycomputer"
   if [[ -d "$REPO_DIR/.git" ]]; then
     note "updating $REPO_DIR..."
@@ -96,6 +106,13 @@ else
   fi
 fi
 cd "$REPO_DIR"
+# Safety net: if for some reason the chosen dir still isn't writable, use a
+# per-user target dir so cargo doesn't blow up with EACCES.
+if [[ ! -w "$REPO_DIR" ]]; then
+  export CARGO_TARGET_DIR="$HOME/.cache/lily-target"
+  mkdir -p "$CARGO_TARGET_DIR"
+  warn "$REPO_DIR not writable — building into $CARGO_TARGET_DIR"
+fi
 
 # ───── 4. build ───────────────────────────────────────────────────────────────
 step "building (~1 min cold, ~25s incremental)"
