@@ -1,0 +1,28 @@
+[package]
+name = "lily"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "lily"
+path = "src/main.rs"
+
+[dependencies]
+lily-core = { workspace = true }
+
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest = { workspace = true }
+futures = { workspace = true }
+futures-util = { workspace = true }
+bytes = { workspace = true }
+
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+eventsource-stream = { workspace = true }

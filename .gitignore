@@ -1,0 +1,22 @@
+/target
+**/*.rs.bk
+.env
+.env.local
+.DS_Store
+*.swp
+*.swo
+/dist
+
+# anything that could hold a secret
+.lily/
+*.token
+secrets/
+
+# editor cruft
+.idea/
+.vscode/
+*.iml
+
+# build artifacts
+*.log
+

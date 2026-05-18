@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lily Computer</title>
+<style>
+  body { font: 13px -apple-system, Helvetica, sans-serif; margin: 24px; max-width: 520px; color: #1f2937; }
+  h1 { font-size: 18px; margin: 0 0 4px; color: #ec4899; }
+  .sub { color: #6b7280; margin-bottom: 18px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #d1d5db; }
+  .dot.ok { background: #10b981; }
+  .dot.bad { background: #ef4444; }
+  code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; }
+  button:hover { background: #f9fafb; }
+  .footer { margin-top: 18px; color: #6b7280; font-size: 12px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<h1>lily computer</h1>
+<div class="sub">Chrome companion — bridges the page to <code>lilyd</code> on <code>127.0.0.1:7777</code>.</div>
+
+<div class="row"><span id="dot" class="dot"></span><span id="status">checking…</span></div>
+<div class="row"><button id="reconnect">Reconnect now</button></div>
+
+<div class="footer">
+  Make sure <code>lilyd</code> is running on this user (<code>launchctl print gui/$(id&nbsp;-u)/computer.lily.daemon</code>).<br>
+  Logs: open <code>chrome://serviceworker-internals</code>, find "Lily Computer", and click <em>Inspect</em>.
+</div>
+
+<script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Lily Computer",
+  "version": "0.1.0",
+  "description": "Companion extension for Lily Computer — lets Lily drive Chrome from your terminal.",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "scripting",
+    "storage",
+    "webNavigation",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "minimum_chrome_version": "116"
+}
