@@ -23,48 +23,56 @@ your computer.
 └─ ⏱ 3.1s · 4 tools · 2,840 tok · ⌃C cancel · ⌃R clear · /help ──────┘
 ```
 
-## Install
-
-> **Heads up:** if you want dual-user mode (Lily drives a separate macOS
-> account while you keep using yours), you have to run the installer on
-> **both** accounts — different command on each. Same Mac, just one
-> Fast-User-Switch between them. See the two boxes below.
-
-### Single-user (simplest)
-
-One Mac account runs everything. Lily acts on the same screen you're using.
+## Install — one command, one user, done
 
 ```bash
 curl -L tinyurl.com/lily-get|sh
 ```
 
-The installer (an interactive step-by-step in your terminal) installs Rust if
-needed, builds, registers `lilyd` as a LaunchAgent, asks for your Groq key
-(skippable — Lily will ask again on first message), walks you 1-by-1 through
-the three macOS permissions, then pauses while you load the Chrome extension
-via `chrome://extensions → Load unpacked`. ~90 seconds total.
+That's it. From whichever macOS account you're on, that one command
+installs Rust if needed, builds, registers `lilyd` as a LaunchAgent,
+asks for your Groq key (or lets you skip and asks later), walks you
+1-by-1 through the three macOS permissions, then pauses while you
+load the Chrome extension via `chrome://extensions → Load unpacked`.
+~90 seconds end-to-end. Then run `lily`. Done.
 
-### Dual-user
+Lily runs on the same account you ran the installer on, and acts on
+the same screen you're using — like any normal AI agent in your
+terminal.
 
-**Run this on the assistant** (Fast User Switch into that account first):
+### Want Lily to drive a separate account? (Optional, advanced)
+
+You can run `lilyd` on a *secondary* macOS account (via Fast User
+Switching) and just the `lily` TUI on your normal account. The
+tradeoff: macOS gives Lily her own screen + apps, and you keep yours.
+
+It's **not** possible to set this up from one user only — Apple gates
+two things per-user that can't be remoted:
+
+1. **Privacy permissions** (Screen Recording / Automation /
+   Accessibility) must be granted from the actual session that owns
+   them. The TCC database is SIP-protected; no root password gets
+   around it.
+2. **Chrome extensions** are installed per-Chrome-profile, and Chrome
+   only lets you load unpacked extensions from a foreground window in
+   that profile.
+
+So dual-user requires one Fast-User-Switch during setup. Same
+installer on each side:
 
 ```bash
-curl -L tinyurl.com/lily-get|sh
+# Fast-User-Switch to the assistant account first, then:
+curl -L tinyurl.com/lily-get|sh           # full install
+
+# Back on your normal account:
+curl -L tinyurl.com/lily-get|sh -s client # ~15s, TUI only
 ```
 
-Full assistant install. Same flow as single-user.
+The TUI on your normal account talks to `lilyd` on the assistant via
+loopback (`127.0.0.1:7777`). After this initial setup, you never have
+to leave your normal account again.
 
-**Run this on the client** (your normal account, where you'll type prompts):
-
-```bash
-curl -L tinyurl.com/lily-get|sh -s client
-```
-
-~15 seconds. Just the `lily` TUI binary + `lc` alias. No daemon, no Chrome,
-no perms. It talks to the assistant's `lilyd` over machine-local loopback
-(`127.0.0.1:7777`).
-
-See [SETUP.md](SETUP.md) for the full step-by-step on each side.
+See [SETUP.md](SETUP.md) for the step-by-step.
 
 ## Have an AI agent set it up for you
 

@@ -1,23 +1,22 @@
 # Lily Computer — Setup
 
-Two ways to run Lily:
+The default and easiest path is **single-user**: run one command on the
+macOS account you're already using and Lily is ready. That's all of
+section 1 below.
 
-- **Single-user.** One Mac account does it all: `lily` (the TUI you type into) and
-  `lilyd` (the daemon that drives Chrome) both run on your normal account.
-  Easiest path. Read the **Assistant guide** below — that's the whole thing.
-
-- **Dual-user.** `lilyd` and Chrome run on a second macOS account you switch to
-  via Fast User Switching. Your normal account just runs `lily` (the TUI) and
-  talks to `lilyd` over loopback. You can keep using your computer while Lily
-  works. Read **both** guides — Assistant first (set up the worker side),
-  then Client.
+The optional advanced path is **dual-user**: run `lilyd` and Chrome on
+a separate macOS account so Lily doesn't share your screen with you.
+This **requires** one Fast-User-Switch during setup because Apple
+gates Privacy permissions and Chrome extension installs per-user —
+neither can be done remotely with a password or any other workaround.
+Once set up, you never have to switch again. That's section 2.
 
 ---
 
-## Assistant guide
+## 1 · Single-user setup (recommended)
 
 This is the side that runs the daemon, Chrome, and the extension.
-(For single-user, this is your only setup.)
+For single-user this is the only setup you need.
 
 ### 1 · Run the installer
 
@@ -104,13 +103,37 @@ screenshot in Preview automatically.
 
 ---
 
-## Client guide
+## 2 · Dual-user setup (optional, advanced)
 
-Only needed if you're running dual-user (the Mac/account where you'll
-type prompts, separate from the assistant). For single-user, skip this
-section — `lily` is already installed.
+Only do this if you specifically want Lily to drive a *separate* macOS
+account on the same Mac while you keep using your normal one. There's
+no way around the per-user setup wall — Apple's security model
+guarantees this:
 
-### 1 · Run the client-only installer
+- **Privacy permissions** (Screen Recording / Automation /
+  Accessibility) live in `/Library/Application
+  Support/com.apple.TCC/TCC.db`, which is SIP-protected. Only the user
+  clicking through System Settings in their own session can grant
+  these. Not even `sudo` works.
+- **Chrome unpacked extensions** can only be loaded from a foreground
+  Chrome window in the destination profile. Programmatic install paths
+  all require Web Store signing.
+
+So the dual-user flow is:
+
+1. **On the assistant account** (FUS over once): run the full installer
+   `curl -L tinyurl.com/lily-get|sh`, grant the three perms, load the
+   Chrome extension. Same flow as section 1.
+2. **Back on your normal account**: run the client-only installer
+   `curl -L tinyurl.com/lily-get|sh -s client`. ~15 seconds. Just the
+   TUI binary.
+
+After step 1, the daemon survives reboot and Fast User Switching via
+LaunchAgent, so you never have to switch back unless you want to
+re-configure something. Day-to-day you just `lily` on your normal
+account and Lily acts in the assistant's session over loopback.
+
+### Client install (the TUI only)
 
 ```bash
 curl -L tinyurl.com/lily-get|sh -s client
@@ -119,35 +142,26 @@ curl -L tinyurl.com/lily-get|sh -s client
 Only ~15 seconds. Builds + installs the `lily` TUI binary (plus the `lc`
 alias). No daemon, no LaunchAgent, no Chrome, no permissions.
 
-### 2 · Verify the assistant is up
+### Verify cross-user connection
+
+After both installers have run, on your normal account:
 
 ```bash
 lily
 ```
 
-If the assistant is reachable, you see the banner inside the TUI and a
-green status dot in the header. If not:
+You should see the banner and a green status dot in the header. If
+instead you get `lily: cannot reach lilyd …`, lilyd isn't running on
+the assistant — FUS over and run `~/lilycomputer/scripts/doctor.sh`
+there.
 
-```
-  lily: cannot reach lilyd at http://127.0.0.1:7777 — connect
-  Is lilyd running on this machine?
-  Try:  launchctl print gui/$(id -u)/computer.lily.daemon
-```
+### Why loopback works between users
 
-That means lilyd isn't running on the assistant. Switch to the assistant
-account and run `~/lilycomputer/scripts/doctor.sh` there.
-
-### Note on loopback
-
-Lily uses `127.0.0.1:7777` for all client↔assistant traffic. On macOS,
-loopback is machine-scoped (not user-scoped), so two users on the same
-Mac via Fast User Switching can talk to each other over it. The token at
-`/Users/Shared/lily/token` is world-readable inside that one Mac, which
-is how both users authenticate.
-
-If you want client and assistant on *different* physical Macs, you'd
-need to expose lilyd on a non-loopback interface and add real auth.
-Not supported out of the box.
+Lily uses `127.0.0.1:7777` for all traffic. On macOS, loopback is
+*machine*-scoped, not user-scoped — two users on the same Mac via FUS
+can talk over it. The shared token at `/Users/Shared/lily/token` is
+readable by both. (Different physical Macs would need a non-loopback
+interface and real auth, which isn't supported out of the box.)
 
 ---
 
